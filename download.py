@@ -3,6 +3,7 @@ import tarfile
 from multiprocessing import Pool
 import argparse
 import requests
+import tqdm
 
 def download_and_extract(args, skip_existing=False):
     file_name, url, raw_dir, images_dir, masks_dir = args
@@ -25,12 +26,17 @@ def download_and_extract(args, skip_existing=False):
             print(f'{file_name} has already been extracted. Skipping extraction.')
         else:
             print(f'Extracting {file_name}...')
-            with tarfile.open(f'{raw_dir}/{file_name}') as tar:
-                for member in tar.getmembers():
-                    if member.name.endswith(".jpg"):
-                        tar.extract(member, path=images_dir)
-                    elif member.name.endswith(".json"):
-                        tar.extract(member, path=masks_dir)
+            try:
+                with tarfile.open(f'{raw_dir}/{file_name}') as tar:
+                    for member in tqdm.tqdm(tar.getmembers()):
+                        if member.name.endswith(".jpg"):
+                            tar.extract(member, path=images_dir)
+                        elif member.name.endswith(".json"):
+                            tar.extract(member, path=masks_dir)
+            except Exception as e:
+                print(f"The TAR file is not valid. Error: {e}")            
+                with open(args.log,'a+') as log:
+                    log.writelines([file_name])
                 
             print(f'{file_name} extracted!')
     else:
@@ -43,7 +49,8 @@ parser.add_argument('--input_file', type=str, default='sa1b_links.txt', help='Pa
 parser.add_argument('--raw_dir', type=str, default='raw', help='Directory to store downloaded files.')
 parser.add_argument('--images_dir', type=str, default='images', help='Directory to store extracted image files.')
 parser.add_argument('--masks_dir', type=str, default='annotations', help='Directory to store extracted JSON mask files.')
-parser.add_argument('--skip_existing', action='store_true', help='Skip extraction if the file has already been extracted')
+parser.add_argument('--skip_existing', action='store_true', help='Skip extraction if the file has already been extracted', default=False)
+parser.add_argument('--log',default='error.log')
 args = parser.parse_args()
 
 # Read the file names and URLs
